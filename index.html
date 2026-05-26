@@ -6,7 +6,7 @@
   <title>🥩 BBQ 買い出しナビ</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #1a0a00; }
@@ -22,40 +22,39 @@
 
     const CAT_MAP = { "牛肉":"beef", "黒毛和牛":"wagyu", "宮崎牛":"miyazaki", "豚肉":"pork", "鶏肉":"chicken" };
 
-    async function loadProductsFromCSV() {
-      try {
-        const res = await fetch("https://docs.google.com/spreadsheets/d/e/2PACX-1vSOImEW5Hb_FVjlsoCB4l6BEV0e0uCkaxSUiLF-CvQ7zF9NIdZgAwjAT_yzvxu0d-tbejMCfn07eF9Y/pub?gid=0&single=true&output=csv");
-        const text = await res.text();
-        const lines = text.trim().split("\n");
-        const headers = lines[0].split(",");
-        const products = [];
-        for (let i = 1; i < lines.length; i++) {
-          // CSVのクォート対応パース
-          const cols = [];
-          let cur = "", inQ = false;
-          for (const ch of lines[i]) {
-            if (ch === '"') { inQ = !inQ; }
-            else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ""; }
-            else { cur += ch; }
-          }
-          cols.push(cur.trim());
-          if (cols.length < 7 || !cols[0]) continue;
-          products.push({
-            id:         Number(cols[0]),
-            category:   CAT_MAP[cols[1]] || cols[1],
-            name:       cols[2].replace(/^"|"$/g,''),
-            pricePerHg: Number(cols[3]),
-            bbqRating:  Number(cols[4]),
-            note:       cols[5].replace(/^"|"$/g,''),
-            packGrams:  Number(cols[6]) || 200,
-            jumboGrams: cols[7] && cols[7] !== '' ? Number(cols[7]) : null,
-          });
+    function parseCSV(text) {
+      const lines = text.trim().split("\n");
+      const products = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = [];
+        let cur = "", inQ = false;
+        for (let ci = 0; ci < lines[i].length; ci++) {
+          const ch = lines[i][ci];
+          if (ch === '"') { inQ = !inQ; }
+          else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ""; }
+          else { cur += ch; }
         }
-        return products.length > 0 ? products : null;
-      } catch(e) {
-        console.error("CSV読み込みエラー:", e);
-        return null;
+        cols.push(cur.trim());
+        if (cols.length < 7 || !cols[0]) continue;
+        products.push({
+          id:         Number(cols[0]),
+          category:   CAT_MAP[cols[1]] || cols[1],
+          name:       cols[2].replace(/^"|"$/g,''),
+          pricePerHg: Number(cols[3]),
+          bbqRating:  Number(cols[4]),
+          note:       cols[5].replace(/^"|"$/g,''),
+          packGrams:  Number(cols[6]) || 200,
+          jumboGrams: cols[7] && cols[7] !== '' ? Number(cols[7]) : null,
+        });
       }
+      return products.length > 0 ? products : null;
+    }
+
+    function loadProductsFromCSV() {
+      return fetch("https://docs.google.com/spreadsheets/d/e/2PACX-1vSOImEW5Hb_FVjlsoCB4l6BEV0e0uCkaxSUiLF-CvQ7zF9NIdZgAwjAT_yzvxu0d-tbejMCfn07eF9Y/pub?gid=0&single=true&output=csv")
+        .then(function(res) { return res.text(); })
+        .then(function(text) { return parseCSV(text); })
+        .catch(function(e) { console.error("CSV読み込みエラー:", e); return null; });
     }
 
 
@@ -988,7 +987,7 @@ function EditPage({ products, setProducts }) {
     setTimeout(() => setSaved(false), 2000);
   };
   const deleteProduct = (id) => {
-    if (!window.confirm("この商品を削除しますか？")) return;
+    if (!confirm("この商品を削除しますか？")) return;
     setProducts(prev => prev.filter(p => p.id !== id));
   };
 
